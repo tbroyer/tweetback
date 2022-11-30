@@ -3,3 +3,4 @@ img/
 .cache
 _site
 .env
+database/tweet.db

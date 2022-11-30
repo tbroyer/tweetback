@@ -1,0 +1,71 @@
+name: deploy
+
+on:
+  push:
+    branches:
+      - main
+  # TODO: schedule (to fetch new data)
+  # schedule:
+  #   - cron: '30 5 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - run: npm ci
+
+      - uses: actions/cache@v3
+        with:
+          path: database/tweet.db
+          # Always store the new tweet.db, even if unchanged
+          key: tweet-db-${{ github.run_number }}-${{ github.run_attempt }}
+          restore-keys: |
+            tweet-db-${{ github.run_number }}
+            tweet-db-
+
+      - run: |
+          [ -f database/tweet.db ] || npm run import
+
+      # TODO: fetch-new-data (on schedule)
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            .cache/
+            img/
+          # Always store the new cache, even if unchanged
+          key: 11ty-cache-${{ github.run_number }}-${{ github.run_attempt }}
+          restore-keys: |
+            11ty-cache-${{ github.run_number }}
+            11ty-cache-
+
+      - run: npm run build -- --pathprefix=tweetback
+
+      - uses: actions/upload-pages-artifact@v1
+
+  deploy:
+    needs: build
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/deploy-pages@v1
+        id: deployment
