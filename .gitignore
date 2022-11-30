@@ -3,4 +3,3 @@ img/
 .cache
 _site
 .env
-package-lock.json
